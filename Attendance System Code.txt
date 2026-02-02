@@ -1,0 +1,74 @@
+Attendance System Code
+import face_recognition
+import cv2
+import numpy as np
+import os
+from datetime import datetime
+
+# Load known faces
+path = "known_faces"
+images = []
+names = []
+
+for file in os.listdir(path):
+    img = face_recognition.load_image_file(f"{path}/{file}")
+    images.append(img)
+    names.append(os.path.splitext(file)[0])
+
+# Encode faces
+def encode_faces(images):
+    encodings = []
+    for img in images:
+        enc = face_recognition.face_encodings(img)[0]
+        encodings.append(enc)
+    return encodings
+
+known_encodings = encode_faces(images)
+
+# Mark attendance
+def mark_attendance(name):
+    with open("attendance.csv", "a") as f:
+        time = datetime.now().strftime("%H:%M:%S")
+        f.write(f"{name},{time}\n")
+
+# Start camera
+cap = cv2.VideoCapture(0)
+
+while True:
+    success, frame = cap.read()
+    if not success:
+        break
+
+    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    faces = face_recognition.face_locations(rgb)
+    encodings = face_recognition.face_encodings(rgb, faces)
+
+    for enc, loc in zip(encodings, faces):
+        matches = face_recognition.compare_faces(known_encodings, enc)
+        face_dist = face_recognition.face_distance(known_encodings, enc)
+
+        best_match = np.argmin(face_dist)
+
+        if matches[best_match]:
+            name = names[best_match]
+            mark_attendance(name)
+        else:
+            name = "Unknown"
+
+        y1, x2, y2, x1 = loc
+        cv2.rectangle(frame, (x1,y1), (x2,y2), (0,255,0), 2)
+        cv2.putText(frame, name, (x1, y1-10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
+
+    cv2.imshow("Attendance System", frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+
+Output:-
+Alice,09:15:22
+Bob,09:15:30
+Charlie,09:15:41
